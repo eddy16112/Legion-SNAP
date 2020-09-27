@@ -26,6 +26,7 @@ DEBUG           ?= 1		# Include debugging symbols
 OUTPUT_LEVEL    ?= LEVEL_DEBUG	# Compile time logging level
 SHARED_LOWLEVEL ?= 0		# Use shared-memory runtime (not recommended)
 USE_CUDA        ?= 0		# Include CUDA support (requires CUDA)
+USE_HIP         ?= 1
 USE_GASNET      ?= 0		# Include GASNet support (requires GASNet)
 USE_HDF         ?= 0		# Include HDF5 support (requires HDF5)
 ALT_MAPPERS     ?= 0		# Include alternative mappers (not recommended)
@@ -43,10 +44,10 @@ GEN_SRC		?= main.cc  \
 		   mms.cc   \
 		   mapper.cc\
 		   convergence.cc # .cc files
-GEN_GPU_SRC	?= gpu_outer.cu \
-		   gpu_inner.cu	\
-		   gpu_sweep.cu \
-		   gpu_expxs.cu # .cu files
+GEN_HIP_SRC	?= gpu_outer.cpp \
+		   gpu_inner.cpp	\
+		   gpu_sweep.cpp \
+		   gpu_expxs.cpp # .cu files
 
 # You can modify these variables, some will be appended to by the runtime makefile
 INC_FLAGS	?=
@@ -54,6 +55,7 @@ CC_FLAGS	?=
 CC_FLAGS	+= -DSNAP_USE_RELAXED_COHERENCE # Do this until Realm supports multi-field reduction instances
 CC_FLAGS	+= -std=c++11 # Need this to deal with linkage issues
 NVCC_FLAGS	?= -std=c++11
+HIPCC_FLAGS     ?= -std=c++11
 GASNET_FLAGS	?=
 LD_FLAGS	?=
 # GCC apparently needs some hand-holding for its name mangling
@@ -64,6 +66,10 @@ CC_FLAGS	+= -DUSE_GPU_KERNELS
 GPU_ARCH	= kepler
 endif
 
+ifeq ($(strip $(USE_HIP)),1)
+CC_FLAGS        += -DUSE_GPU_KERNELS
+GPU_ARCH        = kepler
+endif
 ###########################################################################
 #
 #   Don't change anything below here
