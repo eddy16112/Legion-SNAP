@@ -130,6 +130,10 @@ void Snap::SnapMapper::select_tunable_value(const MapperContext ctx,
           // Mapping to CPUs only
           const int num_cpus = local_cpus.size();
           int result = 8/*directions*/ * Snap::num_groups / num_cpus;
+          // Make sure we have some extra slack on each processor 
+          // for scheduling so we can pipeline if possible
+          if (result >= 4)
+            result /= 4;
           // Clamp it at the number of groups if necessary
           if (result > Snap::num_groups)
             result = Snap::num_groups;
@@ -138,11 +142,27 @@ void Snap::SnapMapper::select_tunable_value(const MapperContext ctx,
           // Mapping to GPUs
           const int num_gpus = local_gpus.size();
           int result = 8/*directions*/ * Snap::num_groups / num_gpus;
+          // Make sure we have some extra slack on each processor 
+          // for scheduling so we can pipeline if possible
+          if (result >= 4)
+            result /= 4;
           // Clamp it at the number of groups if necessary
           if (result > Snap::num_groups)
             result = Snap::num_groups;
           runtime->pack_tunable<int>(result, output);
         }
+        break;
+      }
+    case GPU_SMS_PER_SWEEP_TUNABLE:
+      {
+        // Figure out how many streaming multiprocessors we have
+        int numsm = *((int*)input.args);
+        if (numsm <= 4)
+          runtime->pack_tunable<int>(numsm, output);
+        else if (numsm <= 16)
+          runtime->pack_tunable<int>(4, output);
+        else
+          runtime->pack_tunable<int>(8, output);
         break;
       }
     default:
@@ -185,13 +205,24 @@ void Snap::SnapMapper::map_copy(const MapperContext ctx,
       // First figure out which memory it is going into
       assert(copy.index_point.get_dim() == 3);
       Point<3> point = copy.index_point;
-      assert(global_cpu_mapping.find(point) != global_cpu_mapping.end());
-      Processor cpu_proc = global_cpu_mapping[point];
-      // Find the target memory with affinity to the proper node
-      Machine::MemoryQuery target_query(machine);
-      target_query.has_affinity_to(cpu_proc);
-      target_query.only_kind(Memory::SYSTEM_MEM);
-      Memory target = target_query.first();
+      Memory target;
+      if (global_gpu_mapping.empty()) {
+        assert(global_cpu_mapping.find(point) != global_cpu_mapping.end());
+        Processor cpu_proc = global_cpu_mapping[point];
+        // Find the target memory with affinity to the proper node
+        Machine::MemoryQuery target_query(machine);
+        target_query.has_affinity_to(cpu_proc);
+        target_query.only_kind(Memory::SYSTEM_MEM);
+        target = target_query.first();
+      } else {
+        assert(global_gpu_mapping.find(point) != global_gpu_mapping.end());
+        Processor gpu_proc = global_gpu_mapping[point];
+        // Find the target memory with affinity to the proper node
+        Machine::MemoryQuery target_query(machine);
+        target_query.has_affinity_to(gpu_proc);
+        target_query.only_kind(Memory::GPU_FB_MEM);
+        target = target_query.first();
+      }
       assert(target.exists());
       // Now we can make the instance
       std::vector<LogicalRegion> regions(1, src_region);  
@@ -235,13 +266,24 @@ void Snap::SnapMapper::map_copy(const MapperContext ctx,
       // First figure out which memory it is going into
       assert(copy.index_point.get_dim() == 3);
       Point<3> point = copy.index_point;
-      assert(global_cpu_mapping.find(point) != global_cpu_mapping.end());
-      Processor cpu_proc = global_cpu_mapping[point];
-      // Find the target memory with affinity to the proper node
-      Machine::MemoryQuery target_query(machine);
-      target_query.has_affinity_to(cpu_proc);
-      target_query.only_kind(Memory::SYSTEM_MEM);
-      Memory target = target_query.first();
+      Memory target;
+      if (global_gpu_mapping.empty()) {
+        assert(global_cpu_mapping.find(point) != global_cpu_mapping.end());
+        Processor cpu_proc = global_cpu_mapping[point];
+        // Find the target memory with affinity to the proper node
+        Machine::MemoryQuery target_query(machine);
+        target_query.has_affinity_to(cpu_proc);
+        target_query.only_kind(Memory::SYSTEM_MEM);
+        target = target_query.first();
+      } else {
+        assert(global_gpu_mapping.find(point) != global_gpu_mapping.end());
+        Processor gpu_proc = global_gpu_mapping[point];
+        // Find the target memory with affinity to the proper node
+        Machine::MemoryQuery target_query(machine);
+        target_query.has_affinity_to(gpu_proc);
+        target_query.only_kind(Memory::GPU_FB_MEM);
+        target = target_query.first();
+      }
       assert(target.exists());
       // Now we can make the instance
       std::vector<LogicalRegion> regions(1, dst_region);  
@@ -315,51 +357,25 @@ void Snap::SnapMapper::slice_task(const MapperContext ctx,
 {
   if (!has_variants)
     update_variants(ctx);
-  // Sweep tasks compute their target processors differently than
-  // all the other data parallel tasks
-  if (task.task_id == MINI_KBA_TASK_ID) {
-    // Figure out 3-D point from corner, and wavefront
-    const MiniKBATask::MiniKBAArgs *args = 
-      (const MiniKBATask::MiniKBAArgs*)task.args;  
-    const std::vector<Point<3> > &wavefront_points = 
-      wavefront_map[args->corner][args->wavefront];
-    const bool use_gpu = !local_gpus.empty() &&
-      (gpu_variants.find(MINI_KBA_TASK_ID) != gpu_variants.end());
-    Rect<2> all_points = input.domain;
-    for (RectIterator<2> pir(all_points); pir(); pir++) {
-      // Get the physical space point
-      Point<3> point = wavefront_points[(*pir)[0]];
-      TaskSlice slice;
-      slice.domain = Domain<2>(Rect<2>(*pir, *pir));
-      slice.proc = use_gpu ? global_gpu_mapping[point] : global_cpu_mapping[point];
-      slice.recurse = false;
-      slice.stealable = false;
-      output.slices.push_back(slice);
-    }
-  } else if (task.task_id == INIT_GPU_SWEEP_TASK_ID) {
-    // This one needs the default mapper implementation
-    DefaultMapper::slice_task(ctx, task, input, output);
-  } else {
-    // Iterate over the points and assign them to the best target processors
-    Rect<3> all_points = input.domain;
-    // We still keep convergence tests on the CPU if we're doing reductions
+  // Iterate over the points and assign them to the best target processors
+  Rect<3> all_points = input.domain;
+  // We still keep convergence tests on the CPU if we're doing reductions
 #ifndef SNAP_USE_RELAXED_COHERENCE
-    const bool use_gpu = !local_gpus.empty() &&
-      (gpu_variants.find((SnapTaskID)task.task_id) != gpu_variants.end()) &&
-      (task.task_id != TEST_OUTER_CONVERGENCE_TASK_ID) && 
-      (task.task_id != TEST_INNER_CONVERGENCE_TASK_ID);;
+  const bool use_gpu = !local_gpus.empty() &&
+    (gpu_variants.find((SnapTaskID)task.task_id) != gpu_variants.end()) &&
+    (task.task_id != TEST_OUTER_CONVERGENCE_TASK_ID) && 
+    (task.task_id != TEST_INNER_CONVERGENCE_TASK_ID);;
 #else
-    const bool use_gpu = !local_gpus.empty() &&
-      (gpu_variants.find((SnapTaskID)task.task_id) != gpu_variants.end());
+  const bool use_gpu = !local_gpus.empty() &&
+    (gpu_variants.find((SnapTaskID)task.task_id) != gpu_variants.end());
 #endif
-    for (RectIterator<3> pir(all_points); pir(); pir++) {
-      TaskSlice slice;
-      slice.domain = Domain<3>(Rect<3>(*pir, *pir));
-      slice.proc = use_gpu ? global_gpu_mapping[*pir]:global_cpu_mapping[*pir];
-      slice.recurse = false;
-      slice.stealable = false;
-      output.slices.push_back(slice);
-    }
+  for (RectIterator<3> pir(all_points); pir(); pir++) {
+    TaskSlice slice;
+    slice.domain = Domain<3>(Rect<3>(*pir, *pir));
+    slice.proc = use_gpu ? global_gpu_mapping[*pir]:global_cpu_mapping[*pir];
+    slice.recurse = false;
+    slice.stealable = false;
+    output.slices.push_back(slice);
   }
 }
 
@@ -401,8 +417,11 @@ void Snap::SnapMapper::map_task(const MapperContext ctx,
     case CALC_INNER_SOURCE_TASK_ID:
     case EXPAND_CROSS_SECTION_TASK_ID:
     case EXPAND_SCATTERING_CROSS_SECTION_TASK_ID:
-    case CALCULATE_GEOMETRY_PARAM_TASK_ID:
     case MMS_SCALE_TASK_ID:
+#ifdef SNAP_USE_RELAXED_COHERENCE
+    case TEST_OUTER_CONVERGENCE_TASK_ID:
+    case TEST_INNER_CONVERGENCE_TASK_ID:
+#endif
       {
         Memory target_mem;
         std::map<SnapTaskID,VariantID>::const_iterator finder = 
@@ -435,9 +454,53 @@ void Snap::SnapMapper::map_task(const MapperContext ctx,
         }
         break;
       }
-    // Convergence tests go on CPU always since reductions are coming
-    // from zero-copy memory anyway and we want to avoid using
-    // too much duplicate memory for storing flux0po
+    case CALCULATE_GEOMETRY_PARAM_TASK_ID:
+      {
+        // This task can have a special vdelt which needs to go in 
+        // zero-copy memory so that we can read it early
+        Memory target_mem, vdelt_mem;
+        std::map<SnapTaskID,VariantID>::const_iterator finder = 
+          gpu_variants.find((SnapTaskID)task.task_id);
+        if (finder != gpu_variants.end() && 
+            (local_kind == Processor::TOC_PROC)) {
+          output.chosen_variant = finder->second; 
+#ifdef LOCAL_MAP_TASKS
+          output.target_procs.push_back(task.target_proc);
+          target_mem = get_associated_framebuffer(task.target_proc);
+          vdelt_mem = get_associated_zerocopy(task.target_proc);
+#else
+          output.target_procs.push_back(local_proc);
+          target_mem = local_framebuffer;
+          vdelt_mem = local_zerocopy;
+#endif
+        } else {
+          output.chosen_variant = cpu_variants[(SnapTaskID)task.task_id];
+#ifdef LOCAL_MAP_TASKS
+          get_associated_procs(task.target_proc, output.target_procs);
+          target_mem = get_associated_sysmem(task.target_proc);
+#else
+          output.target_procs = local_cpus;
+          target_mem = local_sysmem;
+#endif
+          vdelt_mem = target_mem;
+        }
+        for (unsigned idx = 0; idx < task.regions.size(); idx++) { 
+          if (task.regions[idx].privilege == NO_ACCESS)
+            continue;
+          if (idx == 1)
+            map_snap_array(ctx, task.regions[idx].region, vdelt_mem,
+                           output.chosen_instances[idx]);
+          else
+            map_snap_array(ctx, task.regions[idx].region, target_mem,
+                           output.chosen_instances[idx]);
+        }
+        break;
+      }
+#ifndef SNAP_USE_RELAXED_COHERENCE
+      // Convergence tests have to go on the CPUs if they are
+      // consuming reduction instances because Realm doesn't know
+      // how to reduce GPU instances directly on the GPUs currently
+      // https://github.com/StanfordLegion/legion/issues/372
     case TEST_OUTER_CONVERGENCE_TASK_ID:
     case TEST_INNER_CONVERGENCE_TASK_ID:
       {
@@ -454,6 +517,7 @@ void Snap::SnapMapper::map_task(const MapperContext ctx,
                          output.chosen_instances[idx]);
         break;
       }
+#endif
     case BIND_INNER_CONVERGENCE_TASK_ID:
     case BIND_OUTER_CONVERGENCE_TASK_ID:
       {

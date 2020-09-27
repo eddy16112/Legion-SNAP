@@ -27,23 +27,45 @@ extern Legion::Logger log_snap;
 CalcInnerSource::CalcInnerSource(const Snap &snap, const Predicate &pred,
                        const SnapArray<3> &s_xs, const SnapArray<3> &flux0,
                        const SnapArray<3> &fluxm, const SnapArray<3> &q2grp0,
-                       const SnapArray<3> &q2grpm, const SnapArray<3> &qtot)
+                       const SnapArray<3> &q2grpm, const SnapArray<3> &qtot,
+                       int group_start, int group_stop)
   : SnapTask<CalcInnerSource, Snap::CALC_INNER_SOURCE_TASK_ID>(
       snap, snap.get_launch_bounds(), pred)
 //------------------------------------------------------------------------------
 {
-  s_xs.add_projection_requirement(READ_ONLY, *this);
-  flux0.add_projection_requirement(READ_ONLY, *this);
-  q2grp0.add_projection_requirement(READ_ONLY, *this);
-  qtot.add_projection_requirement(WRITE_DISCARD, *this);
-  // only include this requirement if we have more than one moment
-  if (Snap::num_moments > 1) {
-    fluxm.add_projection_requirement(READ_ONLY, *this);
-    q2grpm.add_projection_requirement(READ_ONLY, *this);
+  if (group_start == group_stop) {
+    // Special case for a single field
+    const Snap::SnapFieldID group_field = SNAP_ENERGY_GROUP_FIELD(group_start);
+    s_xs.add_projection_requirement(READ_ONLY, *this, group_field);
+    flux0.add_projection_requirement(READ_ONLY, *this, group_field);
+    q2grp0.add_projection_requirement(READ_ONLY, *this, group_field);
+    qtot.add_projection_requirement(WRITE_DISCARD, *this, group_field);
+    // only include this requirement if we have more than one moment
+    if (Snap::num_moments > 1) {
+      fluxm.add_projection_requirement(READ_ONLY, *this, group_field);
+      q2grpm.add_projection_requirement(READ_ONLY, *this, group_field);
+    } else {
+      fluxm.add_projection_requirement(NO_ACCESS, *this);
+      q2grpm.add_projection_requirement(NO_ACCESS, *this);
+    }
   } else {
-    fluxm.add_projection_requirement(NO_ACCESS, *this);
-    q2grpm.add_projection_requirement(NO_ACCESS, *this);
-  }
+    // General case for arbitrary set of fields
+    std::vector<Snap::SnapFieldID> group_fields((group_stop - group_start) + 1);
+    for (int group = group_start; group <= group_stop; group++)
+      group_fields[group-group_start] = SNAP_ENERGY_GROUP_FIELD(group);
+    s_xs.add_projection_requirement(READ_ONLY, *this, group_fields);
+    flux0.add_projection_requirement(READ_ONLY, *this, group_fields);
+    q2grp0.add_projection_requirement(READ_ONLY, *this, group_fields);
+    qtot.add_projection_requirement(WRITE_DISCARD, *this, group_fields);
+    // only include this requirement if we have more than one moment
+    if (Snap::num_moments > 1) {
+      fluxm.add_projection_requirement(READ_ONLY, *this, group_fields);
+      q2grpm.add_projection_requirement(READ_ONLY, *this, group_fields);
+    } else {
+      fluxm.add_projection_requirement(NO_ACCESS, *this);
+      q2grpm.add_projection_requirement(NO_ACCESS, *this);
+    }
+  } 
 }
 
 //------------------------------------------------------------------------------
@@ -159,7 +181,7 @@ CalcInnerSource::CalcInnerSource(const Snap &snap, const Predicate &pred,
 //------------------------------------------------------------------------------
 {
 #ifndef NO_COMPUTE
-#ifdef tSE_GPU_KERNELS
+#ifdef USE_GPU_KERNELS
   Domain<3> dom = runtime->get_index_space_domain(ctx, 
           IndexSpace<3>(task->regions[0].region.get_index_space()));
   const bool multi_moment = (Snap::num_moments > 1);
@@ -171,7 +193,7 @@ CalcInnerSource::CalcInnerSource(const Snap &snap, const Predicate &pred,
         task->regions[0].privilege_fields.begin(); it !=
         task->regions[0].privilege_fields.end(); it++)
   {
-    AccessorRO<MomentQuad,3> fa_sxs(regions[0], *t);
+    AccessorRO<MomentQuad,3> fa_sxs(regions[0], *it);
     AccessorRO<double,3> fa_flux0(regions[1], *it);
     AccessorRO<double,3> fa_q2grp0(regions[2], *it);
     AccessorWO<MomentQuad,3> fa_qtot(regions[3], *it);
@@ -179,7 +201,7 @@ CalcInnerSource::CalcInnerSource(const Snap &snap, const Predicate &pred,
       AccessorRO<MomentTriple,3> fa_fluxm(regions[4], *it);
       AccessorRO<MomentTriple,3> fa_q2grpm(regions[5], *it);
       run_inner_source_multi_moment(dom.bounds, fa_sxs, fa_flux0, fa_q2grp0,
-                                    fa_fluxm, fa_q2grpm, fa_qtot_ptr,
+                                    fa_fluxm, fa_q2grpm, fa_qtot,
                                     Snap::num_moments, Snap::lma);
     } else {
       run_inner_source_single_moment(dom.bounds, fa_sxs, fa_flux0, 
@@ -251,7 +273,8 @@ TestInnerConvergence::TestInnerConvergence(const Snap &snap,
   for (unsigned idx = 0; idx < 2; idx++)
     layout_constraints.add_layout_constraint(idx/*index*/, 
                                              Snap::get_soa_layout());
-  register_gpu_variant<bool, gpu_implementation>(execution_constraints,
+  register_gpu_variant<DeferredValue<bool>, gpu_implementation>(
+                                                 execution_constraints,
                                                  layout_constraints,
                                                  true/*leaf*/);
 }
@@ -301,19 +324,22 @@ TestInnerConvergence::TestInnerConvergence(const Snap &snap,
 }
 
 #ifdef USE_GPU_KERNELS
-extern bool run_inner_convergence(const Rect<3> subgrid_bounds,
+extern void run_inner_convergence(const Rect<3> subgrid_bounds,
+                            const DeferredValue<bool> &result,
                             const std::vector<AccessorRO<double,3> > &fa_flux0,
                             const std::vector<AccessorRO<double,3> > &fa_flux0pi,
                             const double epsi);
 #endif
 
 //------------------------------------------------------------------------------
-/*static*/ bool TestInnerConvergence::gpu_implementation(const Task *task,
+/*static*/ DeferredValue<bool> 
+            TestInnerConvergence::gpu_implementation(const Task *task,
       const std::vector<PhysicalRegion> &regions, Context ctx, Runtime *runtime)
 //------------------------------------------------------------------------------
 {
-#ifndef NO_COMPUTE
   log_snap.info("Running GPU Test Inner Convergence");
+  DeferredValue<bool> result(false);
+#ifndef NO_COMPUTE
 #ifdef USE_GPU_KERNELS
   Domain<3> dom = runtime->get_index_space_domain(ctx, 
           IndexSpace<3>(task->regions[0].region.get_index_space()));
@@ -332,11 +358,11 @@ extern bool run_inner_convergence(const Rect<3> subgrid_bounds,
     fa_flux0[idx] = AccessorRO<double,3>(regions[0], *it);
     fa_flux0pi[idx] = AccessorRO<double,3>(regions[1], *it);
   }
-  return run_inner_convergence(dom.bounds, fa_flux0, fa_flux0pi, epsi);
+  run_inner_convergence(dom.bounds, result, fa_flux0, fa_flux0pi, epsi);
 #else
   assert(false);
 #endif
 #endif
-  return false;
+  return result;
 }
 

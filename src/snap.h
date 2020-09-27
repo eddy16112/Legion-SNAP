@@ -64,6 +64,10 @@ template<int DIM, typename T = long long>
 using DomainIterator = Legion::PointInDomainIterator<DIM,T>;
 template<int DIM, typename T = long long>
 using RectIterator = Legion::PointInRectIterator<DIM,T>;
+template<typename T>
+using DeferredValue = Legion::DeferredValue<T>;
+template<typename T, int DIM, typename COORD_T = long long, bool CHECK_BOUNDS = false>
+using DeferredBuffer = Legion::DeferredBuffer<T,DIM,COORD_T,CHECK_BOUNDS>;
 typedef Legion::Runtime Runtime;
 typedef Legion::Context Context;
 typedef Legion::PhysicalRegion PhysicalRegion;
@@ -175,6 +179,7 @@ public:
     OUTER_RUNAHEAD_TUNABLE = Legion::Mapping::DefaultMapper::DEFAULT_TUNABLE_LAST,
     INNER_RUNAHEAD_TUNABLE = Legion::Mapping::DefaultMapper::DEFAULT_TUNABLE_LAST+1,
     SWEEP_ENERGY_CHUNKS_TUNABLE = Legion::Mapping::DefaultMapper::DEFAULT_TUNABLE_LAST+2,
+    GPU_SMS_PER_SWEEP_TUNABLE = Legion::Mapping::DefaultMapper::DEFAULT_TUNABLE_LAST+3,
   };
   enum SnapReductionID {
     NO_REDUCTION_ID = 0,
@@ -199,22 +204,18 @@ public:
   enum SnapPartitionID {
     DISJOINT_PARTITION = 0,
   };
-#define SNAP_SWEEP_PROJECTION(corner)     \
-  ((Snap::SnapProjectionID)(Snap::SWEEP_PROJECTION + (corner)))
-#define SNAP_XY_PROJECTION(corner)        \
-  ((Snap::SnapProjectionID)(Snap::XY_PROJECTION + (corner)))
-#define SNAP_YZ_PROJECTION(corner)        \
-  ((Snap::SnapProjectionID)(Snap::YZ_PROJECTION + (corner)))
-#define SNAP_XZ_PROJECTION(corner)        \
-  ((Snap::SnapProjectionID)(Snap::XZ_PROJECTION + (corner)))
+#define SNAP_XY_PROJECTION(forward)        \
+  ((Snap::SnapProjectionID)(Snap::XY_PROJECTION + (forward ? 0 : 1)))
+#define SNAP_YZ_PROJECTION(forward)        \
+  ((Snap::SnapProjectionID)(Snap::YZ_PROJECTION + (forward ? 0 : 1)))
+#define SNAP_XZ_PROJECTION(forward)        \
+  ((Snap::SnapProjectionID)(Snap::XZ_PROJECTION + (forward ? 0 : 1)))
   enum SnapProjectionID {
-    SWEEP_PROJECTION = 1,
+    XY_PROJECTION = 1,
     // ...
-    XY_PROJECTION = SWEEP_PROJECTION + 8,
+    YZ_PROJECTION = XY_PROJECTION + 2,
     // ...
-    YZ_PROJECTION = XY_PROJECTION + 8,
-    // ...
-    XZ_PROJECTION = YZ_PROJECTION + 8,
+    XZ_PROJECTION = YZ_PROJECTION + 2,
   };
 public:
   Snap(Context c, Runtime *rt)
@@ -231,8 +232,12 @@ protected:
   void initialize_scattering(const SnapArray<1> &sigt, const SnapArray<1> &siga,
                              const SnapArray<1> &sigs, const SnapArray<2> &slgg) const;
   void initialize_velocity(const SnapArray<1> &vel, const SnapArray<1> &vdelt) const;
-  void save_fluxes(const Predicate &pred,
-                   const SnapArray<3> &src, const SnapArray<3> &dst) const;
+  void save_fluxes(const Predicate &pred, const SnapArray<3> &src, 
+                   const SnapArray<3> &dst, int energy_group_chunks) const;
+  void calculate_inner_source(const Predicate &pred, const SnapArray<3> &s_xs,
+                              const SnapArray<3> &flux0, const SnapArray<3> &fluxm,
+                              const SnapArray<3> &q2grp0, const SnapArray<3> &q2grpm,
+                              const SnapArray<3> &qtot, int energy_group_chunks) const;
   void perform_sweeps(const Predicate &pred, const SnapArray<3> &flux,
                       const SnapArray<3> &fluxm, const SnapArray<3> &qtot, 
                       const SnapArray<1> &vdelt, const SnapArray<3> &dinv, 
@@ -273,15 +278,12 @@ private:
   FieldSpace flux_moment_fs;
   FieldSpace mat_fs;
   FieldSpace angle_fs;
-private:
-  std::vector<IndexSpace<2> > wavefront_domains[8];
 public:
   static void snap_top_level_task(const Task *task,
                                   const std::vector<PhysicalRegion> &regions,
                                   Context ctx, Runtime *runtime); 
 public:
   static void parse_arguments(int argc, char **argv);
-  static void compute_wavefronts(void);
   static void compute_derived_globals(void);
   static void report_arguments(void);
   static void perform_registrations(void);
@@ -326,8 +328,6 @@ public: // derived
   static int nx_per_chunk;
   static int ny_per_chunk;
   static int nz_per_chunk;
-  // Indexed by wavefront number and the point number
-  static std::vector<std::vector<Point<3> > > wavefront_map[8];
 public:
   static double dt; 
   static int cmom;
@@ -660,29 +660,9 @@ protected:
   size_t field_size;
 };
 
-class SnapSweepProjectionFunctor : public ProjectionFunctor {
-public:
-  SnapSweepProjectionFunctor(
-      const std::vector<std::vector<Point<3> > > &wavefront_map);
-public:
-  virtual Legion::LogicalRegion project(const Mappable *mappable, unsigned index,
-                                Legion::LogicalRegion upper_bound,
-                                const Legion::DomainPoint &point);
-  virtual Legion::LogicalRegion project(const Mappable *mappable, unsigned index,
-                                Legion::LogicalPartition upper_bound,
-                                const Legion::DomainPoint &point);
-  Legion::LogicalRegion project_internal(Legion::LogicalPartition upper_bound,
-                                         const Legion::DomainPoint &point);
-  virtual unsigned get_depth(void) const { return 0; }
-  virtual bool is_functional(void) const { return true; }
-public:
-  const std::vector<std::vector<Point<3> > > &wavefront_map;
-};
-
 class FluxProjectionFunctor : public ProjectionFunctor {
 public:
-  FluxProjectionFunctor(Snap::SnapProjectionID kind,
-      const std::vector<std::vector<Point<3> > > &wavefront_map);
+  FluxProjectionFunctor(Snap::SnapProjectionID kind, const bool forward);
 public:
   virtual Legion::LogicalRegion project(const Mappable *mappable, unsigned index,
                                 Legion::LogicalRegion upper_bound,
@@ -692,11 +672,15 @@ public:
                                 const Legion::DomainPoint &point);
   Legion::LogicalRegion project_internal(Legion::LogicalPartition upper_bound,
                                          const Legion::DomainPoint &point);
+  virtual void invert(Legion::LogicalRegion region, Legion::LogicalPartition upper,
+                      const Legion::Domain &launch_domain,
+                      std::vector<Legion::DomainPoint> &ordered_points);
   virtual unsigned get_depth(void) const { return 0; }
   virtual bool is_functional(void) const { return true; }
+  virtual bool is_invertible(void) const { return true; }
 public:
   const Snap::SnapProjectionID projection_kind;
-  const std::vector<std::vector<Point<3> > > &wavefront_map;
+  const bool forward;
 };
 
 class AndReduction {
