@@ -78,6 +78,7 @@ void initialize_gpu_context(const double *ec_h, const double *mu_h,
                             const int nx_per_chunk, const int ny_per_chunk,
                             const int nz_per_chunk)
 {
+  cudaError_t cudaerr;
   int gpu;
   cudaGetDevice(&gpu);
   assert(gpu < MAX_GPUS);
@@ -88,7 +89,8 @@ void initialize_gpu_context(const double *ec_h, const double *mu_h,
     printf("ERROR: out of memory for ec_d of %zd bytes on GPU %d\n", ec_size, gpu);
     exit(1);
   }
-  cudaMemcpy(ec_d[gpu], ec_h, ec_size, cudaMemcpyHostToDevice);
+  cudaerr = cudaMemcpy(ec_d[gpu], ec_h, ec_size, cudaMemcpyHostToDevice);
+  assert(cudaerr == cudaSuccess);
 
   const size_t angle_size = num_angles * sizeof(double);
   if (cudaMalloc((void**)&mu_d[gpu], angle_size) != cudaSuccess)
@@ -96,28 +98,32 @@ void initialize_gpu_context(const double *ec_h, const double *mu_h,
     printf("ERROR: out of memory for mu_d of %zd bytes on GPU %d\n", angle_size, gpu);
     exit(1);
   }
-  cudaMemcpy(mu_d[gpu], mu_h, angle_size, cudaMemcpyHostToDevice);
+  cudaerr = cudaMemcpy(mu_d[gpu], mu_h, angle_size, cudaMemcpyHostToDevice);
+  assert(cudaerr == cudaSuccess);
 
   if (cudaMalloc((void**)&eta_d[gpu], angle_size) != cudaSuccess)
   {
     printf("ERROR: out of memory for eta_d of %zd bytes on GPU %d\n", angle_size, gpu);
     exit(1);
   }
-  cudaMemcpy(eta_d[gpu], eta_h, angle_size, cudaMemcpyHostToDevice);
+  cudaerr = cudaMemcpy(eta_d[gpu], eta_h, angle_size, cudaMemcpyHostToDevice);
+  assert(cudaerr == cudaSuccess);
 
   if (cudaMalloc((void**)&xi_d[gpu], angle_size) != cudaSuccess)
   {
     printf("ERROR: out of memory for xi_d of %zd bytes on GPU %d\n", angle_size, gpu);
     exit(1);
   }
-  cudaMemcpy(xi_d[gpu], xi_h, angle_size, cudaMemcpyHostToDevice);
+  cudaerr = cudaMemcpy(xi_d[gpu], xi_h, angle_size, cudaMemcpyHostToDevice);
+  assert(cudaerr == cudaSuccess);
 
   if (cudaMalloc((void**)&w_d[gpu], angle_size) != cudaSuccess)
   {
     printf("ERROR: out of memory for w_d of %zd bytes on GPU %d\n", angle_size, gpu);
     exit(1);
   }
-  cudaMemcpy(w_d[gpu], w_h, angle_size, cudaMemcpyHostToDevice);
+  cudaerr = cudaMemcpy(w_d[gpu], w_h, angle_size, cudaMemcpyHostToDevice);
+  assert(cudaerr == cudaSuccess);
 
   const size_t flux_x_size = ny_per_chunk * nz_per_chunk * angle_size;
   for (int idx = 0; idx < MAX_STREAMS; idx++)
@@ -205,6 +211,7 @@ void initialize_gpu_context(const double *ec_h, const double *mu_h,
     int *wavefront_length_h = (int*)malloc(wavefront_count * sizeof(int));
     int *wavefront_offset_h = (int*)malloc(wavefront_count* sizeof(int));
     int offset = 0;
+    printf("cpu %p\n", wavefront_length_h);
     for (int i = 0; i < wavefront_count; i++)
     {
       wavefront_offset_h[i] = offset;
@@ -218,8 +225,10 @@ void initialize_gpu_context(const double *ec_h, const double *mu_h,
              corner, wavefront_count * sizeof(int), gpu);
       exit(1);
     }
-    cudaMemcpy(wavefront_length_d[gpu][corner], wavefront_length_h, 
-        wavefront_count * sizeof(int), cudaMemcpyDeviceToHost);
+    printf("gpu %p, cpu %p, size %lld\n", wavefront_length_d[gpu][corner], wavefront_length_h, wavefront_count * sizeof(int));
+    cudaerr = cudaMemcpy(wavefront_length_d[gpu][corner], wavefront_length_h, 
+        wavefront_count * sizeof(int), cudaMemcpyHostToDevice);
+    assert(cudaerr == cudaSuccess);
     if (cudaMalloc((void**)&wavefront_offset_d[gpu][corner], 
           wavefront_count * sizeof(int)) != cudaSuccess)
     {
@@ -227,8 +236,9 @@ void initialize_gpu_context(const double *ec_h, const double *mu_h,
              corner, wavefront_count * sizeof(int), gpu);
       exit(1);
     }
-    cudaMemcpy(wavefront_offset_d[gpu][corner], wavefront_offset_h, 
-        wavefront_count * sizeof(int), cudaMemcpyDeviceToHost);
+    cudaerr = cudaMemcpy(wavefront_offset_d[gpu][corner], wavefront_offset_h, 
+        wavefront_count * sizeof(int), cudaMemcpyHostToDevice);
+    assert(cudaerr == cudaSuccess);
     int *wavefront_x_h = (int*)malloc(offset * sizeof(int));
     int *wavefront_y_h = (int*)malloc(offset * sizeof(int));
     int *wavefront_z_h = (int*)malloc(offset * sizeof(int));
@@ -246,24 +256,27 @@ void initialize_gpu_context(const double *ec_h, const double *mu_h,
           corner, offset * sizeof(int), gpu);
       exit(1);
     }
-    cudaMemcpy(wavefront_x_d[gpu][corner], wavefront_x_h, 
+    cudaerr = cudaMemcpy(wavefront_x_d[gpu][corner], wavefront_x_h, 
         offset * sizeof(int), cudaMemcpyHostToDevice);
+    assert(cudaerr == cudaSuccess);
     if (cudaMalloc((void**)&wavefront_y_d[gpu][corner], offset * sizeof(int)) != cudaSuccess)
     {
       printf("ERROR: out of memory for wavefront y of corner %d of %zd bytes on GPU %d\n",
           corner, offset * sizeof(int), gpu);
       exit(1);
     }
-    cudaMemcpy(wavefront_y_d[gpu][corner], wavefront_y_h, 
+    cudaerr = cudaMemcpy(wavefront_y_d[gpu][corner], wavefront_y_h, 
         offset * sizeof(int), cudaMemcpyHostToDevice);
+    assert(cudaerr == cudaSuccess);
     if (cudaMalloc((void**)&wavefront_z_d[gpu][corner], offset * sizeof(int)) != cudaSuccess)
     {
       printf("ERROR: out of memory for wavefront z of corner %d of %zd bytes on GPU %d\n",
           corner, offset * sizeof(int), gpu);
       exit(1);
     }
-    cudaMemcpy(wavefront_z_d[gpu][corner], wavefront_z_h, 
+    cudaerr = cudaMemcpy(wavefront_z_d[gpu][corner], wavefront_z_h, 
         offset * sizeof(int), cudaMemcpyHostToDevice);
+    assert(cudaerr == cudaSuccess);
     // Make sure all the copies are done before we delete host memory
     cudaDeviceSynchronize();
     free(wavefront_length_h);
@@ -340,7 +353,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
   {
     case 1:
       {
-        gpu_geometry_param<1><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<1><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<1,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<1,
@@ -352,7 +365,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 2:
       {
-        gpu_geometry_param<2><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<2><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<2,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<2,
@@ -364,7 +377,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 3:
       {
-        gpu_geometry_param<3><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<3><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<3,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<3,
@@ -376,7 +389,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 4:
       {
-        gpu_geometry_param<4><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<4><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<4,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<4,
@@ -388,7 +401,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 5:
       {
-        gpu_geometry_param<5><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<5><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<5,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<5,
@@ -400,7 +413,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 6:
       {
-        gpu_geometry_param<6><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<6><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<6,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<6,
@@ -412,7 +425,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 7:
       {
-        gpu_geometry_param<7><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<7><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<7,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<7,
@@ -424,7 +437,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 8:
       {
-        gpu_geometry_param<8><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<8><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<8,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<8,
@@ -436,7 +449,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 9:
       {
-        gpu_geometry_param<9><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<9><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<9,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<9,
@@ -448,7 +461,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 10:
       {
-        gpu_geometry_param<10><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<10><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<10,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<10,
@@ -460,7 +473,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 11:
       {
-        gpu_geometry_param<11><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<11><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<11,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<11,
@@ -472,7 +485,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 12:
       {
-        gpu_geometry_param<12><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<12><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<12,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<12,
@@ -484,7 +497,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 13:
       {
-        gpu_geometry_param<13><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<13><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<13,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<13,
@@ -496,7 +509,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 14:
       {
-        gpu_geometry_param<14><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<14><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<14,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<14,
@@ -508,7 +521,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 15:
       {
-        gpu_geometry_param<15><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<15><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<15,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<15,
@@ -520,7 +533,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 16:
       {
-        gpu_geometry_param<16><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<16><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<16,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<16,
@@ -532,7 +545,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 24:
       {
-        gpu_geometry_param<24><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<24><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<24,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<24,
@@ -544,7 +557,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 32:
       {
-        gpu_geometry_param<32><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<32><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<32,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<32,
@@ -556,7 +569,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 40:
       {
-        gpu_geometry_param<40><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<40><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<40,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<40,
@@ -568,7 +581,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 48:
       {
-        gpu_geometry_param<48><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<48><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<48,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<48,
@@ -580,7 +593,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 56:
       {
-        gpu_geometry_param<56><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<56><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<56,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<56,
@@ -592,7 +605,7 @@ void run_geometry_param(const std::vector<AccessorRO<double,3> > &fa_xs,
       }
     case 64:
       {
-        gpu_geometry_param<64><<<grid,block>>>(subgrid_bounds.lo,
+        gpu_geometry_param<64><<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                       AccessorArray<64,
                                         AccessorRO<double,3>,3>(fa_xs),
                                       AccessorArray<64,
@@ -2099,6 +2112,7 @@ void run_gpu_sweep(const Point<3> origin,
       break;
     }
   }
+  stream_idx = 0;
   assert(stream_idx >= 0);
   // No need to delete the stream, Realm CUDA hijack takes care of it
   if (fixup) {
@@ -2293,6 +2307,7 @@ void run_gpu_sweep(const Point<3> origin,
       }
     }
   }
+  cudaStreamSynchronize(stream);
   cudaStreamDestroy(stream);
 }
 

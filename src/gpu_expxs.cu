@@ -14,7 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+extern "C" {
+cudaStream_t hipGetTaskStream();
+}
 #include "snap.h"
 #include "snap_cuda_help.h"
 
@@ -64,7 +66,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
   {
     case 1:
       {
-        gpu_expand_cross_section<1><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<1><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<1,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<1,
@@ -73,7 +75,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 2:
       {
-        gpu_expand_cross_section<2><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<2><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<2,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<2,
@@ -82,7 +84,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 3:
       {
-        gpu_expand_cross_section<3><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<3><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<3,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<3,
@@ -91,7 +93,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 4:
       {
-        gpu_expand_cross_section<4><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<4><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<4,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<4,
@@ -100,7 +102,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 5:
       {
-        gpu_expand_cross_section<5><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<5><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<5,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<5,
@@ -109,7 +111,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 6:
       {
-        gpu_expand_cross_section<6><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<6><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<6,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<6,
@@ -118,7 +120,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 7:
       {
-        gpu_expand_cross_section<7><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<7><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<7,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<7,
@@ -127,7 +129,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 8:
       {
-        gpu_expand_cross_section<8><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<8><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<8,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<8,
@@ -136,7 +138,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 9:
       {
-        gpu_expand_cross_section<9><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<9><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<9,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<9,
@@ -145,7 +147,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 10:
       {
-        gpu_expand_cross_section<10><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<10><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<10,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<10,
@@ -154,7 +156,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 11:
       {
-        gpu_expand_cross_section<11><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<11><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<11,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<11,
@@ -163,7 +165,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 12:
       {
-        gpu_expand_cross_section<12><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<12><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<12,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<12,
@@ -172,7 +174,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 13:
       {
-        gpu_expand_cross_section<13><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<13><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<13,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<13,
@@ -181,7 +183,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 14:
       {
-        gpu_expand_cross_section<14><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<14><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<14,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<14,
@@ -190,7 +192,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 15:
       {
-        gpu_expand_cross_section<15><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<15><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<15,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<15,
@@ -199,7 +201,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 16:
       {
-        gpu_expand_cross_section<16><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<16><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<16,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<16,
@@ -208,7 +210,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 24:
       {
-        gpu_expand_cross_section<24><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<24><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<24,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<24,
@@ -217,7 +219,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 32:
       {
-        gpu_expand_cross_section<32><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<32><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<32,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<32,
@@ -226,7 +228,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 40:
       {
-        gpu_expand_cross_section<40><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<40><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<40,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<40,
@@ -235,7 +237,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 48:
       {
-        gpu_expand_cross_section<48><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<48><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<48,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<48,
@@ -244,7 +246,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 56:
       {
-        gpu_expand_cross_section<56><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<56><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<56,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<56,
@@ -253,7 +255,7 @@ void run_expand_cross_section(const std::vector<AccessorRO<double,1> > &fa_sig,
       }
     case 64:
       {
-        gpu_expand_cross_section<64><<<grid, block>>>(subgrid_bounds.lo,
+        gpu_expand_cross_section<64><<<grid, block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                        AccessorArray<64,
                                         AccessorRO<double,1>,1>(fa_sig), fa_mat,
                                        AccessorArray<64,
@@ -309,7 +311,7 @@ void run_expand_scattering_cross_section(
   {
     case 1:
       {
-        gpu_expand_scattering_cross_section<1><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<1><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<1,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -319,7 +321,7 @@ void run_expand_scattering_cross_section(
       }
     case 2:
       {
-        gpu_expand_scattering_cross_section<2><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<2><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<2,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -329,7 +331,7 @@ void run_expand_scattering_cross_section(
       }
     case 3:
       {
-        gpu_expand_scattering_cross_section<3><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<3><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<3,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -339,7 +341,7 @@ void run_expand_scattering_cross_section(
       }
     case 4:
       {
-        gpu_expand_scattering_cross_section<4><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<4><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<4,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -349,7 +351,7 @@ void run_expand_scattering_cross_section(
       }
     case 5:
       {
-        gpu_expand_scattering_cross_section<5><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<5><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<5,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -359,7 +361,7 @@ void run_expand_scattering_cross_section(
       }
     case 6:
       {
-        gpu_expand_scattering_cross_section<6><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<6><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<6,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -369,7 +371,7 @@ void run_expand_scattering_cross_section(
       }
     case 7:
       {
-        gpu_expand_scattering_cross_section<7><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<7><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<7,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -379,7 +381,7 @@ void run_expand_scattering_cross_section(
       }
     case 8:
       {
-        gpu_expand_scattering_cross_section<8><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<8><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<8,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -389,7 +391,7 @@ void run_expand_scattering_cross_section(
       }
     case 9:
       {
-        gpu_expand_scattering_cross_section<9><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<9><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<9,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -399,7 +401,7 @@ void run_expand_scattering_cross_section(
       }
     case 10:
       {
-        gpu_expand_scattering_cross_section<10><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<10><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<10,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -409,7 +411,7 @@ void run_expand_scattering_cross_section(
       }
     case 11:
       {
-        gpu_expand_scattering_cross_section<11><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<11><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<11,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -419,7 +421,7 @@ void run_expand_scattering_cross_section(
       }
     case 12:
       {
-        gpu_expand_scattering_cross_section<12><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<12><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<12,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -429,7 +431,7 @@ void run_expand_scattering_cross_section(
       }
     case 13:
       {
-        gpu_expand_scattering_cross_section<13><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<13><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<13,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -439,7 +441,7 @@ void run_expand_scattering_cross_section(
       }
     case 14:
       {
-        gpu_expand_scattering_cross_section<14><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<14><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<14,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -449,7 +451,7 @@ void run_expand_scattering_cross_section(
       }
     case 15:
       {
-        gpu_expand_scattering_cross_section<15><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<15><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<15,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -459,7 +461,7 @@ void run_expand_scattering_cross_section(
       }
     case 16:
       {
-        gpu_expand_scattering_cross_section<16><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<16><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<16,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -469,7 +471,7 @@ void run_expand_scattering_cross_section(
       }
     case 24:
       {
-        gpu_expand_scattering_cross_section<24><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<24><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<24,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -479,7 +481,7 @@ void run_expand_scattering_cross_section(
       }
     case 32:
       {
-        gpu_expand_scattering_cross_section<32><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<32><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<32,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -489,7 +491,7 @@ void run_expand_scattering_cross_section(
       }
     case 40:
       {
-        gpu_expand_scattering_cross_section<40><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<40><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<40,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -499,7 +501,7 @@ void run_expand_scattering_cross_section(
       }
     case 48:
       {
-        gpu_expand_scattering_cross_section<48><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<48><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<48,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -509,7 +511,7 @@ void run_expand_scattering_cross_section(
       }
     case 56:
       {
-        gpu_expand_scattering_cross_section<56><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<56><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<56,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,
@@ -519,7 +521,7 @@ void run_expand_scattering_cross_section(
       }
     case 64:
       {
-        gpu_expand_scattering_cross_section<64><<<grid,block>>>(
+        gpu_expand_scattering_cross_section<64><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<64,AccessorRO<MomentQuad,2>,2>(fa_slgg),
                             fa_mat,

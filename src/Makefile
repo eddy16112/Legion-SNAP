@@ -26,7 +26,7 @@ DEBUG           ?= 1		# Include debugging symbols
 OUTPUT_LEVEL    ?= LEVEL_DEBUG	# Compile time logging level
 SHARED_LOWLEVEL ?= 0		# Use shared-memory runtime (not recommended)
 USE_CUDA        ?= 0		# Include CUDA support (requires CUDA)
-USE_HIP         ?= 1
+USE_HIP         ?= 2
 USE_GASNET      ?= 1		# Include GASNet support (requires GASNet)
 USE_HDF         ?= 0		# Include HDF5 support (requires HDF5)
 ALT_MAPPERS     ?= 0		# Include alternative mappers (not recommended)
@@ -44,7 +44,7 @@ GEN_SRC		?= main.cc  \
 		   mms.cc   \
 		   mapper.cc\
 		   convergence.cc # .cc files
-GEN_GPU_SRC	?= gpu_outer.cu \
+GEN_HIP_SRC	?= gpu_outer.cu \
 		   gpu_inner.cu	\
 		   gpu_sweep.cu \
 		   gpu_expxs.cu # .cu files
@@ -62,9 +62,13 @@ CC_FLAGS	+= $(shell $(CXX) --version | grep -q clang || echo -fabi-version=0)
 
 ifeq ($(strip $(USE_CUDA)),1)
 CC_FLAGS	+= -DUSE_GPU_KERNELS
-GPU_ARCH	= volta 
+#GPU_ARCH	= volta 
 endif
 
+ifeq ($(strip $(USE_HIP)),2)
+CC_FLAGS        += -DUSE_GPU_KERNELS
+#GPU_ARCH       = volta 
+endif
 ###########################################################################
 #
 #   Don't change anything below here

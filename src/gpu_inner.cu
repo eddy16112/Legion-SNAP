@@ -15,7 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+extern "C" {
+cudaStream_t hipGetTaskStream();
+}
 #include "snap.h"
 #include "snap_cuda_help.h"
 
@@ -54,7 +56,7 @@ void run_inner_source_single_moment(const Rect<3> subgrid_bounds,
 
   dim3 block(gcd(x_range,32),gcd(y_range,4),gcd(z_range,4));
   dim3 grid(x_range/block.x, y_range/block.y, z_range/block.z);
-  gpu_inner_source_single_moment<<<grid,block>>>(subgrid_bounds.lo,
+  gpu_inner_source_single_moment<<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                                  fa_sxs, fa_flux0, 
                                                  fa_q2grp0, fa_qtot);
 }
@@ -110,7 +112,7 @@ void run_inner_source_multi_moment(const Rect<3> subgrid_bounds,
 
   dim3 block(gcd(x_range,32),gcd(y_range,4),gcd(z_range,4));
   dim3 grid(x_range/block.x, y_range/block.y, z_range/block.z);
-  gpu_inner_source_multi_moment<<<grid,block>>>(subgrid_bounds.lo,
+  gpu_inner_source_multi_moment<<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                                 fa_sxs, fa_flux0, fa_q2grp0,
                                                 fa_fluxm, fa_q2grpm, fa_qtot,
                                                 num_moments, ConstBuffer<4,int>(lma));
@@ -232,6 +234,6 @@ void run_inner_convergence(const Rect<3> subgrid_bounds,
     block2.x++;
   dim3 grid2(1,1,1);
   const int expected = x_range * y_range * z_range * fa_flux0.size();
-  gpu_sum_inner_convergence<<<grid2,block2>>>(buffer, result, bounds.hi[0]+1, expected);
+  gpu_sum_inner_convergence<<<grid2,block2, 0, hipGetTaskStream()>>>(buffer, result, bounds.hi[0]+1, expected);
 }
 

@@ -15,7 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+extern "C" {
+cudaStream_t hipGetTaskStream();
+}
 #include "snap.h"
 #include "snap_cuda_help.h"
 
@@ -87,7 +89,7 @@ void flux0_launch_helper(Rect<3> subgrid_bounds,
   const int z_range = (subgrid_bounds.hi[2] - subgrid_bounds.lo[2]) + 1;
   dim3 block(gcd(x_range,MAX_X), gcd(y_range,MAX_Y), GROUPS);
   dim3 grid(x_range/block.x, y_range/block.y, z_range);
-  gpu_flux0_outer_source<GROUPS,MAX_X*MAX_Y><<<grid,block>>>(
+  gpu_flux0_outer_source<GROUPS,MAX_X*MAX_Y><<<grid,block, 0, hipGetTaskStream()>>>(
                               subgrid_bounds.lo,
                               AccessorArray<GROUPS,
                                 AccessorRO<double,3>,3>(fa_qi0),
@@ -306,7 +308,7 @@ void fluxm_launch_helper(Rect<3> subgrid_bounds,
   const int z_range = (subgrid_bounds.hi[2] - subgrid_bounds.lo[2]) + 1;
   dim3 block(gcd(x_range,MAX_X), gcd(y_range,MAX_Y), GROUPS);
   dim3 grid(x_range/block.x, y_range/block.y, z_range);
-  gpu_fluxm_outer_source<GROUPS,MAX_X*MAX_Y><<<grid,block>>>(
+  gpu_fluxm_outer_source<GROUPS,MAX_X*MAX_Y><<<grid,block, 0, hipGetTaskStream()>>>(
                             subgrid_bounds.lo,
                             AccessorArray<GROUPS,
                               AccessorRO<MomentTriple,3>,3>(fa_fluxm),
@@ -549,7 +551,7 @@ void run_outer_convergence(Rect<3> subgrid_bounds,
   const Rect<1> bounds(Point<1>(0),Point<1>(total_blocks * fa_flux0.size() - 1));
   DeferredBuffer<int,1> buffer(bounds, Memory::GPU_FB_MEM);
   for (unsigned idx = 0; idx < fa_flux0.size(); idx++) {
-    gpu_outer_convergence<<<grid,block>>>(subgrid_bounds.lo,
+    gpu_outer_convergence<<<grid,block, 0, hipGetTaskStream()>>>(subgrid_bounds.lo,
                                           fa_flux0[idx], fa_flux0po[idx],
                                           epsi, buffer, idx * total_blocks);
   }
@@ -559,6 +561,6 @@ void run_outer_convergence(Rect<3> subgrid_bounds,
     block2.x++;
   dim3 grid2(1,1,1);
   const int expected = x_range * y_range * z_range * fa_flux0.size();
-  gpu_sum_outer_convergence<<<grid2,block2>>>(buffer, result, bounds.hi[0]+1, expected);
+  gpu_sum_outer_convergence<<<grid2,block2, 0, hipGetTaskStream()>>>(buffer, result, bounds.hi[0]+1, expected);
 }
 
