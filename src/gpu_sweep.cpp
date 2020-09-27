@@ -2294,7 +2294,7 @@ void run_gpu_sweep(const Point<3> origin,
       }
     }
   }
-  hipStreamSynchronize();
+  hipStreamSynchronize(stream);
   hipStreamDestroy(stream);
 }
 
