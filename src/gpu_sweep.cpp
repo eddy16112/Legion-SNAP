@@ -248,7 +248,7 @@ void initialize_gpu_context(const double *ec_h, const double *mu_h,
       exit(1);
     }
     hipMemcpy(wavefront_x_d[gpu][corner], wavefront_x_h, 
-        offset * sizeof(int), hipMemcpyHostToDevice);
+        offset * sizeof(int), hipMemcpyDeviceToHost);
     if (hipMalloc((void**)&wavefront_y_d[gpu][corner], offset * sizeof(int)) != hipSuccess)
     {
       printf("ERROR: out of memory for wavefront y of corner %d of %zd bytes on GPU %d\n",
@@ -256,7 +256,7 @@ void initialize_gpu_context(const double *ec_h, const double *mu_h,
       exit(1);
     }
     hipMemcpy(wavefront_y_d[gpu][corner], wavefront_y_h, 
-        offset * sizeof(int), hipMemcpyHostToDevice);
+        offset * sizeof(int), hipMemcpyDeviceToHost);
     if (hipMalloc((void**)&wavefront_z_d[gpu][corner], offset * sizeof(int)) != hipSuccess)
     {
       printf("ERROR: out of memory for wavefront z of corner %d of %zd bytes on GPU %d\n",
@@ -264,7 +264,7 @@ void initialize_gpu_context(const double *ec_h, const double *mu_h,
       exit(1);
     }
     hipMemcpy(wavefront_z_d[gpu][corner], wavefront_z_h, 
-        offset * sizeof(int), hipMemcpyHostToDevice);
+        offset * sizeof(int), hipMemcpyDeviceToHost);
     // Make sure all the copies are done before we delete host memory
     hipDeviceSynchronize();
     free(wavefront_length_h);
