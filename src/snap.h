@@ -32,6 +32,9 @@
 #ifndef SNAP_MAX_ENERGY_GROUPS
 #define SNAP_MAX_ENERGY_GROUPS            1024
 #endif
+#ifndef SNAP_MAX_WAVEFRONTS
+#define SNAP_MAX_WAVEFRONTS               1024
+#endif
 
 #ifndef PI
 #define PI (3.14159265358979)
@@ -87,7 +90,11 @@ typedef Legion::RegionRequirement RegionRequirement;
 typedef Legion::Mappable Mappable;
 typedef Legion::Task Task;
 typedef Legion::Copy Copy;
+typedef Legion::Close Close;
+typedef Legion::Partition Partition;
+typedef Legion::Fill Fill;
 typedef Legion::ProjectionID ProjectionID;
+typedef Legion::ShardID ShardID;
 typedef Legion::LayoutConstraintID LayoutConstraintID;
 typedef Legion::FieldID FieldID;
 typedef Legion::PrivilegeMode PrivilegeMode;
@@ -123,6 +130,8 @@ public:
     SNAP_TOP_LEVEL_TASK_ID,
     INIT_MATERIAL_TASK_ID,
     INIT_SOURCE_TASK_ID,
+    INIT_SCATTERING_TASK_ID,
+    INIT_VELOCITY_TASK_ID,
     INIT_GPU_SWEEP_TASK_ID,
     CALC_OUTER_SOURCE_TASK_ID,
     TEST_OUTER_CONVERGENCE_TASK_ID,
@@ -146,6 +155,8 @@ public:
     "Top_Level_Task",                   \
     "Initialize_Material",              \
     "Initialize_Source",                \
+    "Initialize_Scattering",            \
+    "Initialize_Velocity",              \
     "Initialize_GPU Sweep",             \
     "Calc_Outer_Source",                \
     "Test_Outer_Convergence",           \
@@ -217,6 +228,7 @@ public:
     // ...
     XZ_PROJECTION = YZ_PROJECTION + 2,
   };
+#define SNAP_SHARDING_ID        1
 public:
   Snap(Context c, Runtime *rt)
     : ctx(c), runtime(rt) { }
@@ -285,7 +297,7 @@ public:
 public:
   static void parse_arguments(int argc, char **argv);
   static void compute_derived_globals(void);
-  static void report_arguments(void);
+  static void report_arguments(Runtime *runtime, Context ctx);
   static void perform_registrations(void);
   static void mapper_registration(Machine machine, Runtime *runtime,
                                   const std::set<Processor> &local_procs);
@@ -382,6 +394,27 @@ public:
                           const Task &task,
                           const MapTaskInput &input,
                                 MapTaskOutput &output);
+  public:
+    virtual void select_sharding_functor(const MapperContext ctx,
+                                         const Task &task,
+                                         const SelectShardingFunctorInput &input,
+                                               SelectShardingFunctorOutput &output);
+    virtual void select_sharding_functor(const MapperContext ctx,
+                                         const Copy &copy,
+                                         const SelectShardingFunctorInput &input,
+                                               SelectShardingFunctorOutput &output);
+    virtual void select_sharding_functor(const MapperContext ctx,
+                                         const Close &close,
+                                         const SelectShardingFunctorInput &input,
+                                               SelectShardingFunctorOutput &output);
+    virtual void select_sharding_functor(const MapperContext ctx,
+                                         const Partition &partition,
+                                         const SelectShardingFunctorInput &input,
+                                               SelectShardingFunctorOutput &output);
+    virtual void select_sharding_functor(const MapperContext ctx,
+                                         const Fill &fill,
+                                         const SelectShardingFunctorInput &input,
+                                               SelectShardingFunctorOutput &output);
   protected:
     void update_variants(const MapperContext ctx);
     void map_snap_array(const MapperContext ctx, 
@@ -670,17 +703,35 @@ public:
   virtual Legion::LogicalRegion project(const Mappable *mappable, unsigned index,
                                 Legion::LogicalPartition upper_bound,
                                 const Legion::DomainPoint &point);
-  Legion::LogicalRegion project_internal(Legion::LogicalPartition upper_bound,
-                                         const Legion::DomainPoint &point);
+  virtual Legion::LogicalRegion project(Legion::LogicalRegion upper_bound, 
+                                const Legion::DomainPoint &point,
+                                const Legion::Domain &launch_domain);
+  virtual Legion::LogicalRegion project(Legion::LogicalPartition upper_bound,
+                                const Legion::DomainPoint &point,
+                                const Legion::Domain &launch_domain);
   virtual void invert(Legion::LogicalRegion region, Legion::LogicalPartition upper,
                       const Legion::Domain &launch_domain,
                       std::vector<Legion::DomainPoint> &ordered_points);
   virtual unsigned get_depth(void) const { return 0; }
   virtual bool is_functional(void) const { return true; }
+  virtual bool is_exclusive(void) const { return true; }
   virtual bool is_invertible(void) const { return true; }
 public:
   const Snap::SnapProjectionID projection_kind;
   const bool forward;
+};
+
+class SnapShardingFunctor : public Legion::ShardingFunctor {
+public:
+  SnapShardingFunctor(int x_chunks, int y_chunks, int z_chunks);
+public:
+  size_t linearize_point(const Point<3> &point) const;
+public:
+  virtual ShardID shard(const Legion::DomainPoint &point,
+                        const Legion::Domain &full_space,
+                        const size_t total_shards);
+public:
+  const int x_chunks, y_chunks, z_chunks;
 };
 
 class AndReduction {

@@ -415,12 +415,11 @@ extern void run_geometry_param(const std::vector<AccessorRO<double,3> > &xs_ptrs
   Domain<3> dom = runtime->get_index_space_domain(ctx, 
           IndexSpace<3>(task->regions[2].region.get_index_space()));
 
-  const size_t buffer_size = Snap::num_angles * sizeof(double);
-
   std::vector<double> vdelts(num_groups);
   std::vector<AccessorRO<double,3> > fa_xs(num_groups);
   std::vector<AccessorWO<double,3> > fa_dinv(num_groups);
   unsigned idx = 0;
+  const size_t buffer_size = Snap::num_angles * sizeof(double);
   for (int group = group_start; group <= group_stop; group++, idx++)
   {
     fa_xs[idx] = 

@@ -177,12 +177,12 @@ void Snap::SnapMapper::speculate(const MapperContext ctx,
                                        SpeculativeOutput &output)
 //------------------------------------------------------------------------------
 {
-#ifdef ENABLE_SPECULATION
+#ifdef DISABLE_SPECULATION
+  output.speculate = false;
+#else
   output.speculate = true;
   output.speculative_value = true; // not converged
   output.speculate_mapping_only = true;
-#else
-  output.speculate = false;
 #endif
 }
 
@@ -358,7 +358,7 @@ void Snap::SnapMapper::slice_task(const MapperContext ctx,
   if (!has_variants)
     update_variants(ctx);
   // Iterate over the points and assign them to the best target processors
-  Rect<3> all_points = input.domain;
+  Domain<3> all_points = input.domain;
   // We still keep convergence tests on the CPU if we're doing reductions
 #ifndef SNAP_USE_RELAXED_COHERENCE
   const bool use_gpu = !local_gpus.empty() &&
@@ -369,7 +369,7 @@ void Snap::SnapMapper::slice_task(const MapperContext ctx,
   const bool use_gpu = !local_gpus.empty() &&
     (gpu_variants.find((SnapTaskID)task.task_id) != gpu_variants.end());
 #endif
-  for (RectIterator<3> pir(all_points); pir(); pir++) {
+  for (DomainIterator<3> pir(all_points); pir(); pir++) {
     TaskSlice slice;
     slice.domain = Domain<3>(Rect<3>(*pir, *pir));
     slice.proc = use_gpu ? global_gpu_mapping[*pir]:global_cpu_mapping[*pir];
@@ -611,6 +611,59 @@ void Snap::SnapMapper::map_task(const MapperContext ctx,
       }
   }
   runtime->acquire_instances(ctx, output.chosen_instances);
+}
+
+//------------------------------------------------------------------------------
+void Snap::SnapMapper::select_sharding_functor(const MapperContext ctx,
+                                               const Task &task,
+                                      const SelectShardingFunctorInput &input,
+                                            SelectShardingFunctorOutput &output)
+//------------------------------------------------------------------------------
+{
+  output.chosen_functor = SNAP_SHARDING_ID;
+}
+
+//------------------------------------------------------------------------------
+void Snap::SnapMapper::select_sharding_functor(const MapperContext ctx,
+                                               const Copy &copy,
+                                      const SelectShardingFunctorInput &input,
+                                            SelectShardingFunctorOutput &output)
+//------------------------------------------------------------------------------
+{
+  output.chosen_functor = SNAP_SHARDING_ID;
+}
+
+//------------------------------------------------------------------------------
+void Snap::SnapMapper::select_sharding_functor(const MapperContext ctx,
+                                               const Close &close,
+                                      const SelectShardingFunctorInput &input,
+                                            SelectShardingFunctorOutput &output)
+//------------------------------------------------------------------------------
+{
+  output.chosen_functor = SNAP_SHARDING_ID;
+}
+
+//------------------------------------------------------------------------------
+void Snap::SnapMapper::select_sharding_functor(const MapperContext ctx,
+                                               const Partition &partition,
+                                      const SelectShardingFunctorInput &input,
+                                            SelectShardingFunctorOutput &output)
+//------------------------------------------------------------------------------
+{
+  output.chosen_functor = SNAP_SHARDING_ID;
+}
+
+//------------------------------------------------------------------------------
+void Snap::SnapMapper::select_sharding_functor(const MapperContext ctx,
+                                               const Fill &fill,
+                                      const SelectShardingFunctorInput &input,
+                                            SelectShardingFunctorOutput &output)
+//------------------------------------------------------------------------------
+{
+  if (fill.index_domain.get_dim() == 3)
+    output.chosen_functor = SNAP_SHARDING_ID;
+  else
+    output.chosen_functor = 0;
 }
 
 //------------------------------------------------------------------------------
