@@ -55,6 +55,7 @@ CC_FLAGS	?=
 CC_FLAGS	+= -DDISABLE_SPECULATION -DSNAP_USE_RELAXED_COHERENCE # Do this until Realm supports multi-field reduction instances
 CC_FLAGS	+= -std=c++11 # Need this to deal with linkage issues
 NVCC_FLAGS	?= -std=c++11
+HIPCC_FLAGS     ?= -std=c++11
 GASNET_FLAGS	?=
 LD_FLAGS	?=
 # GCC apparently needs some hand-holding for its name mangling
